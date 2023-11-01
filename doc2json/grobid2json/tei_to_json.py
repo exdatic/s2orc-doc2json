@@ -429,7 +429,9 @@ def process_paragraph(
             'cite_spans': [],
             'ref_spans': [],
             'eq_spans': [],
-            'section': section_names
+            'section': section_names,
+            'bboxes': [],
+            'page': 0
         }
 
     # replace formulas with formula text
@@ -441,9 +443,13 @@ def process_paragraph(
     # generate citation map for paragraph element (keep only cite spans with bib entry or unlinked)
     cite_map = process_citations_in_paragraph(para_el, sp, bib_dict, bracket)
 
+    sents = []
+    for sent in para_el.find_all("s"):
+        if sent.text:
+            sents.append(sent.text)
+    para_text = " ".join(sents)
     # substitute space characters
-    para_text = re.sub(r'\s+', ' ', para_el.text)
-    para_text = re.sub(r'\s', ' ', para_text)
+    para_text = re.sub(r'\s+', ' ', para_text)
 
     # get all cite and ref spans
     all_spans_to_replace = []
@@ -488,14 +494,47 @@ def process_paragraph(
 
     for ref_blob in ref_span_blobs:
         assert para_text[ref_blob["start"]:ref_blob["end"]] == ref_blob["text"]
-
+    
+    bboxes = extract_bboxes_from_paragraph(sp, para_el)
+    if bboxes and bboxes[0]:
+        page = bboxes[0][0]["page"]
+    else:
+        page = 0
     return {
         'text': para_text,
+        'bboxes': bboxes,
         'cite_spans': cite_span_blobs,
         'ref_spans': ref_span_blobs,
         'eq_spans': [],
-        'section': section_names
+        'section': section_names,
+        'page': page
     }
+
+
+def extract_bboxes_from_paragraph(sp: BeautifulSoup, para_el: bs4.element.Tag) -> List[Dict]:
+    pages = {
+        (int(p["n"])): (float(p["lrx"]), float(p["lry"]))  # type: ignore
+        for p in sp.select("facsimile surface")
+    }
+    chunk_bboxes = []
+    for sentence in para_el.find_all("s"):
+        # paragraph_text.append(sentence.text)
+        sbboxes = []
+        for bbox in sentence.get("coords").split(";"):
+            box = bbox.split(",")
+            page, x, y, w, h = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
+            page_width, page_height = pages[page]
+            sbboxes.append({
+                "page": page,
+                "xmax": page_width,
+                "ymax": page_height,
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
+            })
+        chunk_bboxes.append(sbboxes)
+    return chunk_bboxes
 
 
 def extract_abstract_from_tei_xml(

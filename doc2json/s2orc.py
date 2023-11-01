@@ -355,7 +355,9 @@ class Paragraph:
             ref_spans: List[Dict],
             eq_spans: Optional[List[Dict]] = [],
             section: Optional = None,
-            sec_num: Optional = None
+            sec_num: Optional = None,
+            bboxes: List[Dict] = [],
+            page: int = 0
     ):
         self.text = text
         self.cite_spans = cite_spans
@@ -372,6 +374,8 @@ class Paragraph:
         else:
             section_list = section
         self.section = section_list
+        self.bboxes = bboxes
+        self.page = page
 
     def as_json(self):
         return {
@@ -380,7 +384,9 @@ class Paragraph:
             "ref_spans": self.ref_spans,
             "eq_spans": self.eq_spans,
             "section": '::'.join([sec[1] for sec in self.section]) if self.section else "",
-            "sec_num": self.section[-1][0] if self.section else None
+            "sec_num": self.section[-1][0] if self.section else None,
+            "bboxes": self.bboxes,
+            "page": self.page
         }
 
 
