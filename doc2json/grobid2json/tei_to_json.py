@@ -124,9 +124,9 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
     for fig in sp.find_all('figure'):
         try:
             if fig.name and fig.get('xml:id'):
-                bboxes = extract_bboxes_from_figure(fig, pages)
-                if bboxes and bboxes[0]:
-                    page = bboxes[0][0]["page"]
+                bboxes: List[Dict] = extract_bboxes_from_figure(fig, pages)
+                if bboxes:
+                    page = bboxes[0]["page"]
                 else:
                     page = 0
                 if fig.get('type') == 'table':
@@ -525,7 +525,7 @@ def process_paragraph(
     }
 
 
-def extract_bboxes_from_paragraph(para_el: bs4.element.Tag, pages) -> List[Dict]:
+def extract_bboxes_from_paragraph(para_el: bs4.element.Tag, pages) -> List[List[Dict]]:
     bboxes = []
     for sent_el in para_el.find_all("s"):
         sbboxes = extract_bboxes(sent_el, pages)
@@ -537,7 +537,7 @@ def extract_bboxes_from_figure(fig_el: bs4.element.Tag, pages) -> List[Dict]:
     return extract_bboxes(fig_el, pages)
 
 
-def extract_bboxes(sent_el, pages):
+def extract_bboxes(sent_el, pages) -> List[Dict]:
     bboxes = []
     for bbox in sent_el.get("coords").split(";"):
         box = bbox.split(",")
