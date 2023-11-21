@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import sys
 import bs4
 import re
 from bs4 import BeautifulSoup, NavigableString
@@ -113,7 +112,7 @@ def table_to_html(table: bs4.element.Tag) -> str:
     return table_str
 
 
-def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup) -> Dict[str, Dict]:
+def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, Tuple[float, float]]) -> Dict[str, Dict]:
     """
     Generate figure and table dicts
     :param sp:
@@ -130,7 +129,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup) -> Dict[str, Dict
                         "latex": None,
                         "type": "table",
                         "content": table_to_html(fig.table),
-                        "fig_num": fig.get('xml:id')
+                        "fig_num": fig.get('xml:id'),
+                        "bboxes": extract_bboxes_from_figure(fig, pages)
                     }
                 else:
                     if True in [char.isdigit() for char in fig.findNext('head').findNext('label')]:
@@ -142,7 +142,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup) -> Dict[str, Dict
                         "latex": None,
                         "type": "figure",
                         "content": "",
-                        "fig_num": fig_num
+                        "fig_num": fig_num,
+                        "bboxes": extract_bboxes_from_figure(fig, pages)
                     }
         except AttributeError:
             continue
@@ -410,7 +411,8 @@ def process_paragraph(
         section_names: List[Tuple],
         bib_dict: Dict,
         ref_dict: Dict,
-        bracket: bool
+        bracket: bool,
+        pages: Dict[int, Tuple[float, float]]
 ) -> Dict:
     """
     Process one paragraph
@@ -495,7 +497,7 @@ def process_paragraph(
     for ref_blob in ref_span_blobs:
         assert para_text[ref_blob["start"]:ref_blob["end"]] == ref_blob["text"]
     
-    bboxes = extract_bboxes_from_paragraph(sp, para_el)
+    bboxes = extract_bboxes_from_paragraph(para_el, pages)
     if bboxes and bboxes[0]:
         page = bboxes[0][0]["page"]
     else:
@@ -511,20 +513,25 @@ def process_paragraph(
     }
 
 
-def extract_bboxes_from_paragraph(sp: BeautifulSoup, para_el: bs4.element.Tag) -> List[Dict]:
-    pages = {
-        (int(p["n"])): (float(p["lrx"]), float(p["lry"]))  # type: ignore
-        for p in sp.select("facsimile surface")
-    }
+def extract_bboxes_from_paragraph(para_el: bs4.element.Tag, pages) -> List[Dict]:
     chunk_bboxes = []
-    for sentence in para_el.find_all("s"):
-        # paragraph_text.append(sentence.text)
-        sbboxes = []
-        for bbox in sentence.get("coords").split(";"):
-            box = bbox.split(",")
-            page, x, y, w, h = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
-            page_width, page_height = pages[page]
-            sbboxes.append({
+    for sent_el in para_el.find_all("s"):
+        sbboxes = extract_bboxes(sent_el, pages)
+        chunk_bboxes.append(sbboxes)
+    return chunk_bboxes
+
+
+def extract_bboxes_from_figure(fig_el: bs4.element.Tag, pages) -> List[Dict]:
+    return extract_bboxes(fig_el, pages)
+
+
+def extract_bboxes(sent_el, pages):
+    bboxes = []
+    for bbox in sent_el.get("coords").split(";"):
+        box = bbox.split(",")
+        page, x, y, w, h = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
+        page_width, page_height = pages[page]
+        bboxes.append({
                 "page": page,
                 "xmax": page_width,
                 "ymax": page_height,
@@ -533,15 +540,15 @@ def extract_bboxes_from_paragraph(sp: BeautifulSoup, para_el: bs4.element.Tag) -
                 "w": w,
                 "h": h,
             })
-        chunk_bboxes.append(sbboxes)
-    return chunk_bboxes
+    return bboxes
 
 
 def extract_abstract_from_tei_xml(
         sp: BeautifulSoup,
         bib_dict: Dict,
         ref_dict: Dict,
-        cleanup_bracket: bool
+        cleanup_bracket: bool,
+        pages: Dict[int, Tuple[float, float]]
 ) -> List[Dict]:
     """
     Parse abstract from soup
@@ -561,25 +568,25 @@ def extract_abstract_from_tei_xml(
                         for para in div.find_all('p'):
                             if para.text:
                                 abstract_text.append(
-                                    process_paragraph(sp, para, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket)
+                                    process_paragraph(sp, para, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket, pages)
                                 )
                     else:
                         if div.text:
                             abstract_text.append(
-                                process_paragraph(sp, div, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket)
+                                process_paragraph(sp, div, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket, pages)
                             )
         # process all paragraphs
         elif sp.abstract.p:
             for para in sp.abstract.find_all('p'):
                 if para.text:
                     abstract_text.append(
-                        process_paragraph(sp, para, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket)
+                        process_paragraph(sp, para, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket, pages)
                     )
         # else just try to get the text
         else:
             if sp.abstract.text:
                 abstract_text.append(
-                    process_paragraph(sp, sp.abstract, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket)
+                    process_paragraph(sp, sp.abstract, [(None, "Abstract")], bib_dict, ref_dict, cleanup_bracket, pages)
                 )
         sp.abstract.decompose()
     return abstract_text
@@ -591,7 +598,8 @@ def extract_body_text_from_div(
         sections: List[Tuple],
         bib_dict: Dict,
         ref_dict: Dict,
-        cleanup_bracket: bool
+        cleanup_bracket: bool,
+        pages: Dict[int, Tuple[float, float]]
 ) -> List[Dict]:
     """
     Parse body text from soup
@@ -615,7 +623,8 @@ def extract_body_text_from_div(
                     sections + [(subdiv.head.get('n', None), subdiv.head.text.strip())],
                     bib_dict,
                     ref_dict,
-                    cleanup_bracket
+                    cleanup_bracket,
+                    pages
                 )
                 subdiv.head.decompose()
             # no header, process with same section list
@@ -626,7 +635,8 @@ def extract_body_text_from_div(
                     sections,
                     bib_dict,
                     ref_dict,
-                    cleanup_bracket
+                    cleanup_bracket,
+                    pages
                 )
     # process tags individuals
     for tag in div:
@@ -634,7 +644,7 @@ def extract_body_text_from_div(
             if tag.name == 'p':
                 if tag.text:
                     chunks.append(process_paragraph(
-                        sp, tag, sections, bib_dict, ref_dict, cleanup_bracket
+                        sp, tag, sections, bib_dict, ref_dict, cleanup_bracket, pages
                     ))
             elif tag.name == 'formula':
                 # e.g. <formula xml:id="formula_0">Y = W T X.<label>(1)</label></formula>
@@ -660,7 +670,7 @@ def extract_body_text_from_div(
         except AttributeError:
             if tag.text:
                 chunks.append(process_paragraph(
-                    sp, tag, sections, bib_dict, ref_dict, cleanup_bracket
+                    sp, tag, sections, bib_dict, ref_dict, cleanup_bracket, pages
                 ))
 
     return chunks
@@ -670,7 +680,8 @@ def extract_body_text_from_tei_xml(
         sp: BeautifulSoup,
         bib_dict: Dict,
         ref_dict: Dict,
-        cleanup_bracket: bool
+        cleanup_bracket: bool,
+        pages: Dict[int, Tuple[float, float]]
 ) -> List[Dict]:
     """
     Parse body text from soup
@@ -682,7 +693,7 @@ def extract_body_text_from_tei_xml(
     """
     body_text = []
     if sp.body:
-        body_text = extract_body_text_from_div(sp, sp.body, [], bib_dict, ref_dict, cleanup_bracket)
+        body_text = extract_body_text_from_div(sp, sp.body, [], bib_dict, ref_dict, cleanup_bracket, pages)
         sp.body.decompose()
     return body_text
 
@@ -691,7 +702,8 @@ def extract_back_matter_from_tei_xml(
         sp: BeautifulSoup,
         bib_dict: Dict,
         ref_dict: Dict,
-        cleanup_bracket: bool
+        cleanup_bracket: bool,
+        pages: Dict[int, Tuple[float, float]]
 ) -> List[Dict]:
     """
     Parse back matter from soup
@@ -721,7 +733,7 @@ def extract_back_matter_from_tei_xml(
                 if child_div.text:
                     if child_div.text:
                         back_text.append(
-                            process_paragraph(sp, child_div, [(section_num, section_title)], bib_dict, ref_dict, cleanup_bracket)
+                            process_paragraph(sp, child_div, [(section_num, section_title)], bib_dict, ref_dict, cleanup_bracket, pages)
                         )
         sp.back.decompose()
     return back_text
@@ -748,9 +760,12 @@ def convert_tei_xml_soup_to_s2orc_json(soup: BeautifulSoup, paper_id: str, pdf_h
 
     # # process formulas and replace with text
     # extract_formulas_from_tei_xml(soup)
-
+    pages = {
+        int(p["n"]): (float(p["lrx"]), float(p["lry"]))  # type: ignore
+        for p in soup.select("facsimile surface")
+    }
     # extract figure and table captions
-    refkey_map = extract_figures_and_tables_from_tei_xml(soup)
+    refkey_map = extract_figures_and_tables_from_tei_xml(soup, pages)
 
     # get bracket style
     is_bracket_style = check_if_citations_are_bracket_style(soup)
@@ -759,13 +774,13 @@ def convert_tei_xml_soup_to_s2orc_json(soup: BeautifulSoup, paper_id: str, pdf_h
     soup = sub_all_note_tags(soup)
 
     # process abstract if possible
-    abstract_entries = extract_abstract_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style)
+    abstract_entries = extract_abstract_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style, pages)
 
     # process body text
-    body_entries = extract_body_text_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style)
+    body_entries = extract_body_text_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style, pages)
 
     # parse back matter (acks, author statements, competing interests, abbrevs etc)
-    back_matter = extract_back_matter_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style)
+    back_matter = extract_back_matter_from_tei_xml(soup, bibkey_map, refkey_map, is_bracket_style, pages)
 
     # form final paper entry
     return Paper(
