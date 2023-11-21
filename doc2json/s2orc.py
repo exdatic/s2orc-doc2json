@@ -365,7 +365,7 @@ class Paragraph:
             eq_spans: Optional[List[Dict]] = [],
             section: Optional = None,
             sec_num: Optional = None,
-            bboxes: List[Dict] = [],
+            bboxes: List[List[Dict]] = [],
             page: int = 0
     ):
         self.text = text
@@ -385,6 +385,7 @@ class Paragraph:
         self.section = section_list
         self.bboxes = bboxes
         self.page = page
+        self.type = 'paragraph'
 
     def as_json(self):
         return {
@@ -395,7 +396,8 @@ class Paragraph:
             "section": '::'.join([sec[1] for sec in self.section]) if self.section else "",
             "sec_num": self.section[-1][0] if self.section else None,
             "bboxes": self.bboxes,
-            "page": self.page
+            "page": self.page,
+            "type": self.type
         }
 
 
