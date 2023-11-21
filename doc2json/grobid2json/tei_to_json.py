@@ -148,7 +148,7 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
                         "content": "",
                         "fig_num": fig_num,
                         "bboxes": extract_bboxes_from_figure(fig, pages),
-                        "section": [(fig_count, f"Figure {str(table_count)}")]
+                        "section": [(fig_count, f"Figure {str(fig_count)}")]
                     }
         except AttributeError:
             continue
