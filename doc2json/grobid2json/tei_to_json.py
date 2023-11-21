@@ -119,31 +119,36 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
     :return:
     """
     ref_map = dict()
-
+    table_count = 0
+    fig_count = 0
     for fig in sp.find_all('figure'):
         try:
             if fig.name and fig.get('xml:id'):
                 if fig.get('type') == 'table':
+                    table_count += 1
                     ref_map[normalize_grobid_id(fig.get('xml:id'))] = {
                         "text": fig.figDesc.text.strip() if fig.figDesc else fig.head.text.strip() if fig.head else "",
                         "latex": None,
                         "type": "table",
                         "content": table_to_html(fig.table),
                         "fig_num": fig.get('xml:id'),
-                        "bboxes": extract_bboxes_from_figure(fig, pages)
+                        "bboxes": extract_bboxes_from_figure(fig, pages),
+                        "section": [(table_count, f"Table {str(table_count)}")]
                     }
                 else:
                     if True in [char.isdigit() for char in fig.findNext('head').findNext('label')]:
                         fig_num = fig.findNext('head').findNext('label').contents[0]
                     else:
                         fig_num = None
+                    fig_count += 1
                     ref_map[normalize_grobid_id(fig.get('xml:id'))] = {
                         "text": fig.figDesc.text.strip() if fig.figDesc else "",
                         "latex": None,
                         "type": "figure",
                         "content": "",
                         "fig_num": fig_num,
-                        "bboxes": extract_bboxes_from_figure(fig, pages)
+                        "bboxes": extract_bboxes_from_figure(fig, pages),
+                        "section": [(fig_count, f"Figure {str(table_count)}")]
                     }
         except AttributeError:
             continue
