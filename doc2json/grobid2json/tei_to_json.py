@@ -124,6 +124,11 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
     for fig in sp.find_all('figure'):
         try:
             if fig.name and fig.get('xml:id'):
+                bboxes = extract_bboxes_from_figure(fig, pages)
+                if bboxes and bboxes[0]:
+                    page = bboxes[0][0]["page"]
+                else:
+                    page = 0
                 if fig.get('type') == 'table':
                     table_count += 1
                     ref_map[normalize_grobid_id(fig.get('xml:id'))] = {
@@ -133,7 +138,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
                         "content": table_to_html(fig.table),
                         "fig_num": fig.get('xml:id'),
                         "bboxes": extract_bboxes_from_figure(fig, pages),
-                        "section": [(table_count, f"Table {str(table_count)}")]
+                        "section": [(table_count, f"Table {str(table_count)}")],
+                        "page": page
                     }
                 else:
                     if True in [char.isdigit() for char in fig.findNext('head').findNext('label')]:
@@ -148,7 +154,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
                         "content": "",
                         "fig_num": fig_num,
                         "bboxes": extract_bboxes_from_figure(fig, pages),
-                        "section": [(fig_count, f"Figure {str(fig_count)}")]
+                        "section": [(fig_count, f"Figure {str(fig_count)}")],
+                        "page": page
                     }
         except AttributeError:
             continue
@@ -519,11 +526,11 @@ def process_paragraph(
 
 
 def extract_bboxes_from_paragraph(para_el: bs4.element.Tag, pages) -> List[Dict]:
-    chunk_bboxes = []
+    bboxes = []
     for sent_el in para_el.find_all("s"):
         sbboxes = extract_bboxes(sent_el, pages)
-        chunk_bboxes.append(sbboxes)
-    return chunk_bboxes
+        bboxes.append(sbboxes)
+    return bboxes
 
 
 def extract_bboxes_from_figure(fig_el: bs4.element.Tag, pages) -> List[Dict]:

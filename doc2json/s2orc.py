@@ -18,8 +18,8 @@ SKIP_KEYS = {
 }
 
 REFERENCE_OUTPUT_KEYS = {
-    'figure': {'text', 'type_str', 'uris', 'num', 'fig_num', 'bboxes', 'section'},
-    'table': {'text', 'type_str', 'content', 'num', 'html', 'bboxes', 'section'},
+    'figure': {'text', 'type_str', 'uris', 'num', 'fig_num', 'bboxes', 'section', 'page'},
+    'table': {'text', 'type_str', 'content', 'num', 'html', 'bboxes', 'section', 'page'},
     'footnote': {'text', 'type_str', 'num'},
     'section': {'text', 'type_str', 'num', 'parent'},
     'equation': {'text', 'type_str', 'latex', 'mathml', 'num'}
@@ -65,7 +65,8 @@ class ReferenceEntry:
             parent: Optional[str] = None,
             fig_num: Optional[str] = None,
             bboxes: List[Dict] = [],
-            section: List[tuple] = []
+            section: List[tuple] = [],
+            page: int = 0
     ):
         self.ref_id = ref_id
         self.text = text
@@ -80,6 +81,7 @@ class ReferenceEntry:
         self.fig_num = fig_num
         self.bboxes = bboxes
         self.section = section
+        self.page = page
 
     def as_json(self):
         keep_keys = REFERENCE_OUTPUT_KEYS.get(self.type_str, None)
@@ -100,7 +102,8 @@ class ReferenceEntry:
                 "parent": self.parent,
                 "fig_num": self.fig_num,
                 "bboxes": self.bboxes,
-                "section": "::".join([sec[1] for sec in self.section]) if self.section else ""
+                "section": "::".join([sec[1] for sec in self.section]) if self.section else "",
+                "page": self.page
             }
 
 
