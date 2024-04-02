@@ -539,19 +539,20 @@ def extract_bboxes_from_figure(fig_el: bs4.element.Tag, pages) -> List[List[Dict
 
 def extract_bboxes(sent_el, pages) -> List[Dict]:
     bboxes = []
-    for bbox in sent_el.get("coords").split(";"):
+    for bbox in sent_el.get("coords", "").split(";"):
         box = bbox.split(",")
-        page, x, y, w, h = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
-        page_width, page_height = pages[page]
-        bboxes.append({
-                "page": page,
-                "xmax": page_width,
-                "ymax": page_height,
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-            })
+        if len(box) >= 5:
+            page, x, y, w, h = int(box[0]), float(box[1]), float(box[2]), float(box[3]), float(box[4])
+            page_width, page_height = pages[page]
+            bboxes.append({
+                    "page": page,
+                    "xmax": page_width,
+                    "ymax": page_height,
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                })
     return bboxes
 
 
