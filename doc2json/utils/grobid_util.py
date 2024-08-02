@@ -380,9 +380,23 @@ def extract_paper_metadata_from_grobid_xml(tag: bs4.element.Tag) -> Dict:
     :return:
     """
     clean_tags(tag)
+    # get journal title (only seems to work when consolidateHeader=1 in Grobid)
+    venue = None
+    for level in ['j', 'm', 's']:
+        title_tag = tag.find('title', {'level': level})
+        if title_tag:
+            venue = title_tag.text
+            break
+    # get year
+    year = None
+    date = get_publication_datetime_from_grobid_xml(tag)
+    if date:
+        year = date.split('-')[0]
     paper_metadata = {
         "title": tag.titlestmt.title.text,
         "authors": get_author_data_from_grobid_xml(tag),
-        "year": get_publication_datetime_from_grobid_xml(tag)
+        "year": year,
+        "identifiers": dict(get_other_ids_from_grobid_xml(tag)),  # type: ignore
+        "venue": venue
     }
     return paper_metadata
