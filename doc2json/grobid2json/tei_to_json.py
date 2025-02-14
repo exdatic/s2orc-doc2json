@@ -137,7 +137,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
                         "type": "table",
                         "content": table_to_html(fig.table),
                         "fig_num": fig.get('xml:id'),
-                        "bboxes": extract_bboxes_from_figure(fig, pages),
+                        "bboxes": bboxes,
+                        "fig_bboxes": extract_bboxes_from_figure(fig.table, pages),
                         "section": [(table_count, f"Table {str(table_count)}")],
                         "page": page
                     }
@@ -153,7 +154,8 @@ def extract_figures_and_tables_from_tei_xml(sp: BeautifulSoup, pages: Dict[int, 
                         "type": "figure",
                         "content": "",
                         "fig_num": fig_num,
-                        "bboxes": extract_bboxes_from_figure(fig, pages),
+                        "bboxes": bboxes,
+                        "fig_bboxes": bboxes,
                         "section": [(fig_count, f"Figure {str(fig_count)}")],
                         "page": page
                     }

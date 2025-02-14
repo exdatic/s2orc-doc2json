@@ -65,6 +65,7 @@ class ReferenceEntry:
             parent: Optional[str] = None,
             fig_num: Optional[str] = None,
             bboxes: List[Dict] = [],
+            fig_bboxes: List[Dict] = [],
             section: List[tuple] = [],
             page: int = 0
     ):
@@ -80,6 +81,7 @@ class ReferenceEntry:
         self.parent = parent
         self.fig_num = fig_num
         self.bboxes = bboxes
+        self.fig_bboxes = fig_bboxes
         self.section = section
         self.page = page
 
@@ -102,6 +104,7 @@ class ReferenceEntry:
                 "parent": self.parent,
                 "fig_num": self.fig_num,
                 "bboxes": self.bboxes,
+                "fig_bboxes": self.fig_bboxes,
                 "section": "::".join([sec[1] for sec in self.section]) if self.section else "",
                 "page": self.page
             }
